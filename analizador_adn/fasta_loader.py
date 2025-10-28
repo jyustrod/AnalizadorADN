@@ -8,7 +8,7 @@ class FastaLoader:
         self.filename = filename
         self.sequences = {}
 
-    def load_fasta(self, filename=None):
+    def load_fasta(self, filename=None, progress_callback=None):
         # Permitir pasar el nombre aquí o en el constructor
         if filename:
             self.filename = filename
@@ -19,11 +19,31 @@ class FastaLoader:
         self.sequences = {}
         current_header = None
         current_seq_parts = []  # lista de trozos de secuencia que luego se unirán
+        headers_count = 0
+        lines_count = 0
+
+        def _report_progress(f):
+            if progress_callback:
+                bytes_read = 0
+                try:
+                    # En modo texto, tell suele devolver el offset de bytes consumidos
+                    bytes_read = f.tell()
+                except Exception:
+                    try:
+                        bytes_read = f.buffer.tell()
+                    except Exception:
+                        bytes_read = 0
+                try:
+                    progress_callback(headers_count, bytes_read, lines_count)
+                except Exception:
+                    # No romper la carga si el callback falla
+                    pass
 
         try:
             # with abre el fichero y lo cierra automáticamente al salir del bloque
             with open(self.filename, "r", encoding="utf-8") as f:
                 for raw_line in f:  # recorrer línea a línea
+                    lines_count += 1
                     line = raw_line.strip()  # strip quita espacios y saltos de línea
                     if not line:
                         # saltar líneas vacías
@@ -42,6 +62,9 @@ class FastaLoader:
                         # Guardar el nuevo encabezado (sin el '>') y resetear acumulador
                         current_header = line[1:].strip() or "sin_nombre"
                         current_seq_parts = []
+                        headers_count += 1
+                        if headers_count % 100 == 0:
+                            _report_progress(f)
                     else:
                         # Acumular trozos de secuencia tal cual (luego se normaliza a mayúsculas)
                         current_seq_parts.append(line)
@@ -54,6 +77,8 @@ class FastaLoader:
                         header_to_use = "{}__{}".format(current_header, i)
                         i += 1
                     self.sequences[header_to_use] = seq
+                # Informe final
+                _report_progress(f)
         except FileNotFoundError:
             # Error típico: ruta incorrecta o archivo inexistente
             raise FileNotFoundError("No se encontró el archivo: {}".format(self.filename))
@@ -63,6 +88,7 @@ class FastaLoader:
                 current_header = None
                 current_seq_parts = []
                 for raw_line in f:
+                    lines_count += 1
                     line = raw_line.strip()
                     if not line:
                         continue
@@ -77,6 +103,9 @@ class FastaLoader:
                             self.sequences[header_to_use] = seq
                         current_header = line[1:].strip() or "sin_nombre"
                         current_seq_parts = []
+                        headers_count += 1
+                        if headers_count % 100 == 0:
+                            _report_progress(f)
                     else:
                         current_seq_parts.append(line)
                 if current_header is not None:
@@ -87,6 +116,7 @@ class FastaLoader:
                         header_to_use = "{}__{}".format(current_header, i)
                         i += 1
                     self.sequences[header_to_use] = seq
+                _report_progress(f)
 
         # Comprobar que se ha leído algo con sentido
         if not self.sequences:

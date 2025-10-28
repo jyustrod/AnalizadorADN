@@ -18,6 +18,7 @@ except Exception:
     from translator import Translator
     from mutator import Mutator
 
+import os  # añadido para normalizar rutas y comprobar tamaño/ existencia
 
 # class define un "molde" para crear objetos con datos (atributos) y funciones (métodos)
 class DNAApp:
@@ -54,10 +55,46 @@ class DNAApp:
 
     def opcion_cargar(self):
         # input lee del teclado; strip quita espacios de los extremos
-        ruta = input("Ruta del archivo FASTA: ").strip()
+        ruta_in = input("Ruta del archivo FASTA: ").strip()
+        if not ruta_in:
+            print("No se ingresó ninguna ruta.")
+            return
+        # Quitar comillas envolventes si se pegaron desde el explorador
+        if (ruta_in.startswith('"') and ruta_in.endswith('"')) or (ruta_in.startswith("'") and ruta_in.endswith("'")):
+            ruta_in = ruta_in[1:-1]
+        # Expandir ~ y variables de entorno, y normalizar separadores
+        ruta_norm = os.path.normpath(os.path.expandvars(os.path.expanduser(ruta_in)))
+
+        # En Windows, soportar rutas largas agregando el prefijo \\?\ si aplica
+        if os.name == 'nt' and len(ruta_norm) >= 260 and not ruta_norm.startswith('\\\\?\\'):
+            if os.path.isabs(ruta_norm):
+                ruta_norm = r"\\\\?\\" + ruta_norm
+
+        if not os.path.exists(ruta_norm):
+            print("La ruta no existe: {}".format(ruta_norm))
+            return
         try:
-            # Llamar al cargador y luego propagar las secuencias a las demás clases
-            seqs = self.loader.load_fasta(ruta)
+            tam = 0
+            try:
+                tam = os.path.getsize(ruta_norm)
+            except OSError:
+                pass
+
+            progress_every = 0
+            def _progreso(headers, bytes_read, lines):
+                # imprimir cada cierto número de cabeceras para no saturar
+                if progress_every and headers % progress_every == 0:
+                    mb = bytes_read / (1024*1024) if bytes_read else 0
+                    print("  > Progreso: {} secuencias leídas (~{:.1f} MB)".format(headers, mb))
+
+            if tam and tam >= 100*1024*1024:  # >=100 MB
+                print("Archivo grande detectado (>=100 MB). La carga puede tardar unos minutos...")
+                # informar cada 100 cabeceras
+                progress_every = 100
+                seqs = self.loader.load_fasta(ruta_norm, progress_callback=_progreso)
+            else:
+                seqs = self.loader.load_fasta(ruta_norm)
+
             self._refrescar_dependientes()
             print("Hecho. Se han cargado {} secuencias.".format(len(seqs)))
         except Exception as e:
