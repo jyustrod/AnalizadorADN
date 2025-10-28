@@ -1,8 +1,7 @@
-"""Punto de entrada ejecutable para la app de análisis de ADN."""
+"""Definir el punto de entrada ejecutable para la aplicación de análisis de ADN."""
 
 from analizador_adn.app import main
 
 
 if __name__ == "__main__":
     main()
-

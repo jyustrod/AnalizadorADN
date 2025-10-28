@@ -1,4 +1,3 @@
-# Paquete del analizador de ADN
-# Por ahora solo expongo la versión.
+# Definir elementos exportables del paquete
 
 __version__ = "0.1.0"
