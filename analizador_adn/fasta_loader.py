@@ -1,49 +1,51 @@
 # Lector básico de archivos FASTA
 
+# En Python, un fichero FASTA tiene líneas que empiezan por '>' (encabezado)
+# y luego líneas con la secuencia. Aquí se guardan como {encabezado: secuencia}
 class FastaLoader:
-    # Almacenar el nombre del archivo y las secuencias cargadas
+    # __init__ guarda el nombre de archivo y un dict vacío para las secuencias
     def __init__(self, filename=None):
         self.filename = filename
-        # Almacenar las secuencias como {encabezado: secuencia}
         self.sequences = {}
 
     def load_fasta(self, filename=None):
-        # Cargar el archivo FASTA y rellenar self.sequences
-        # Utilizar un lector simple que cubre los casos más comunes
+        # Permitir pasar el nombre aquí o en el constructor
         if filename:
             self.filename = filename
         if not self.filename:
             raise ValueError("No se indicó el nombre del archivo FASTA")
 
+        # Reiniciar el diccionario de secuencias
         self.sequences = {}
         current_header = None
-        current_seq_parts = []
+        current_seq_parts = []  # lista de trozos de secuencia que luego se unirán
 
         try:
+            # with abre el fichero y lo cierra automáticamente al salir del bloque
             with open(self.filename, "r", encoding="utf-8") as f:
-                for raw_line in f:
-                    line = raw_line.strip()
+                for raw_line in f:  # recorrer línea a línea
+                    line = raw_line.strip()  # strip quita espacios y saltos de línea
                     if not line:
-                        # Ignorar líneas vacías
+                        # saltar líneas vacías
                         continue
                     if line.startswith(">"):
-                        # Al detectar un nuevo encabezado, guardar el anterior si corresponde
+                        # Al ver un encabezado nuevo, guardar el anterior si hubiera
                         if current_header is not None:
                             seq = "".join(current_seq_parts).replace(" ", "").upper()
-                            # Evitar sobrescribir encabezados repetidos agregando un sufijo numerado
+                            # Evitar sobrescribir: si ya existe el mismo encabezado, añadir sufijo __2, __3, ...
                             header_to_use = current_header
                             i = 2
                             while header_to_use in self.sequences:
                                 header_to_use = "{}__{}".format(current_header, i)
                                 i += 1
                             self.sequences[header_to_use] = seq
-                        # Iniciar un nuevo bloque para el encabezado actual
+                        # Guardar el nuevo encabezado (sin el '>') y resetear acumulador
                         current_header = line[1:].strip() or "sin_nombre"
                         current_seq_parts = []
                     else:
-                        # Acumular líneas de secuencia
+                        # Acumular trozos de secuencia tal cual (luego se normaliza a mayúsculas)
                         current_seq_parts.append(line)
-                # Al finalizar, guardar la última secuencia pendiente si existe
+                # Al acabar el fichero, no olvidar guardar el último bloque
                 if current_header is not None:
                     seq = "".join(current_seq_parts).replace(" ", "").upper()
                     header_to_use = current_header
@@ -53,10 +55,10 @@ class FastaLoader:
                         i += 1
                     self.sequences[header_to_use] = seq
         except FileNotFoundError:
-            # Manejar error de archivo inexistente
+            # Error típico: ruta incorrecta o archivo inexistente
             raise FileNotFoundError("No se encontró el archivo: {}".format(self.filename))
         except UnicodeDecodeError:
-            # Reintentar con manejo básico de errores de codificación
+            # Si hay lío con la codificación (UTF-8), leer ignorando errores
             with open(self.filename, "r", errors="ignore") as f:
                 current_header = None
                 current_seq_parts = []
@@ -86,11 +88,11 @@ class FastaLoader:
                         i += 1
                     self.sequences[header_to_use] = seq
 
-        # Validar formato básico del archivo
+        # Comprobar que se ha leído algo con sentido
         if not self.sequences:
             raise ValueError("El archivo FASTA parece estar vacío o mal formateado")
         return self.sequences
 
     def get_sequences(self):
-        # Devolver las secuencias cargadas
+        # Devolver el dict con las secuencias
         return self.sequences

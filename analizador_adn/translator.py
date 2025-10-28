@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 
-# Convertir ADN a ARN y luego a proteína
+# Traducir ADN→ARN y ARN→Proteína
 class Translator:
     def __init__(self):
-        # Definir la tabla simple de codones -> aminoácidos (1 letra)
+        # Diccionario (tabla) de codones a aminoácidos; las claves son tripletes (UUU, AUG, ...)
+        # y los valores son letras de aminoácidos (formato 1 letra). '*' se usa como STOP (paro).
         self.codon_table = {
             # Fenilalanina
             "UUU": "F", "UUC": "F",
@@ -46,27 +47,26 @@ class Translator:
             "CGU": "R", "CGC": "R", "CGA": "R", "CGG": "R", "AGA": "R", "AGG": "R",
             # Glicina
             "GGU": "G", "GGC": "G", "GGA": "G", "GGG": "G",
-            # STOP
+            # STOP (paro)
             "UAA": "*", "UAG": "*", "UGA": "*",
         }
 
     def transcribe_dna_to_rna(self, dna_seq):
-        # Reemplazar T por U para convertir de ADN a ARN
+        # Pasar de ADN a ARN es básicamente cambiar T por U; también se quitan espacios y saltos de línea
         if dna_seq is None:
             return ""
         return (dna_seq.upper().replace("T", "U").replace("\n", "").replace(" ", ""))
 
     def translate_to_protein(self, rna_seq):
-        # Traducir ARN a aminoácidos utilizando la tabla de codones
-        # Interrumpir en codón de paro (*)
+        # Recorrer la cadena en pasos de 3 (codones) y mapear a aminoácidos usando la tabla
+        # Si se ve un STOP ('*'), se corta la traducción (break)
         if not rna_seq:
             return ""
         rna = rna_seq.upper().replace(" ", "")
         prot = []
-        # Recorrer la secuencia en pasos de 3 (codones)
-        for i in range(0, len(rna) - 2, 3):
+        for i in range(0, len(rna) - 2, 3):  # range con paso de 3
             codon = rna[i:i+3]
-            aa = self.codon_table.get(codon, "?")
+            aa = self.codon_table.get(codon, "?")  # '?' indica codón desconocido
             if aa == "*":
                 break
             prot.append(aa)
